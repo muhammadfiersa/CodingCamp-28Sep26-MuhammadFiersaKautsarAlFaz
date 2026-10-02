@@ -1,0 +1,345 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense &amp; Budget Visualizer</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+</head>
+<body>
+
+  <!-- ===== TOP NAV ===== -->
+  <header class="top-nav" role="banner">
+    <div class="nav-inner">
+      <span class="nav-brand">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="22" height="22">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+        </svg>
+        PengeluaranKu
+      </span>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="nav-links" id="nav-links" role="navigation" aria-label="Main navigation">
+        <a href="#" class="nav-link active" data-view="dashboard">Dashboard</a>
+        <a href="#" class="nav-link" data-view="expenses">Transaksi</a>
+        <a href="#" class="nav-link" data-view="budgets">Anggaran</a>
+      </nav>
+      <button class="btn-darkmode" id="darkmode-toggle" aria-label="Alihkan mode gelap" title="Mode Gelap / Terang">
+        <span class="darkmode-icon" aria-hidden="true">🌙</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== TOAST CONTAINER ===== -->
+  <div id="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="app-main">
+
+    <!-- ============================== -->
+    <!-- VIEW: DASHBOARD                -->
+    <!-- ============================== -->
+    <section id="view-dashboard" class="view active" aria-label="Dashboard">
+
+      <!-- Period selector -->
+      <div class="section-header">
+        <h1 class="section-title">Dashboard</h1>
+        <div class="period-selector">
+          <label for="dashboard-period" class="sr-only">Pilih Periode</label>
+          <input type="month" id="dashboard-period" class="period-input" aria-label="Pilih Periode" />
+        </div>
+      </div>
+
+      <!-- Summary cards -->
+      <div class="summary-cards" role="region" aria-label="Ringkasan keuangan">
+        <article class="card card--spending">
+          <p class="card-label">Total Pengeluaran</p>
+          <p class="card-value" id="summary-spending">Rp 0</p>
+        </article>
+        <article class="card card--budgeted">
+          <p class="card-label">Total Anggaran</p>
+          <p class="card-value" id="summary-budgeted">Rp 0</p>
+        </article>
+        <article class="card card--remaining">
+          <p class="card-label">Total Saldo</p>
+          <p class="card-value" id="summary-remaining">Rp 0</p>
+        </article>
+      </div>
+
+      <!-- Category progress bars -->
+      <div class="dashboard-grid">
+        <section class="panel" aria-label="Progress anggaran per kategori">
+          <h2 class="panel-title">Anggaran per Kategori</h2>
+          <div id="budget-progress-list" class="budget-progress-list">
+            <p class="empty-state" id="budget-progress-empty">Belum ada anggaran untuk periode ini.</p>
+          </div>
+        </section>
+
+        <!-- Charts -->
+        <section class="panel" aria-label="Grafik pengeluaran">
+          <h2 class="panel-title">Grafik Pengeluaran</h2>
+          <div class="charts-wrapper">
+            <div class="chart-container">
+              <h3 class="chart-title">Per Kategori (Bar)</h3>
+              <canvas id="chart-bar" role="img" aria-label="Bar chart pengeluaran per kategori"></canvas>
+            </div>
+            <div class="chart-container">
+              <h3 class="chart-title">Distribusi (Pie)</h3>
+              <canvas id="chart-pie" role="img" aria-label="Pie chart distribusi pengeluaran"></canvas>
+            </div>
+          </div>
+          <p class="empty-state" id="chart-empty" hidden>Belum ada data pengeluaran untuk periode ini.</p>
+        </section>
+      </div>
+
+      <!-- Monthly Summary -->
+      <section class="panel" aria-label="Ringkasan Bulanan">
+        <h2 class="panel-title">📅 Ringkasan Bulanan</h2>
+        <div id="monthly-summary-list" class="monthly-summary-list">
+          <p class="empty-state" id="monthly-summary-empty">Belum ada data transaksi.</p>
+        </div>
+      </section>
+
+    </section><!-- /view-dashboard -->
+
+
+    <!-- ============================== -->
+    <!-- VIEW: EXPENSE LIST             -->
+    <!-- ============================== -->
+    <section id="view-expenses" class="view" aria-label="Daftar Transaksi" hidden>
+
+      <div class="section-header">
+        <h1 class="section-title">Daftar Transaksi</h1>
+      </div>
+
+      <!-- Expense form -->
+      <div class="panel">
+        <h2 class="panel-title" id="expense-form-title">Tambah Transaksi</h2>
+        <form id="expense-form" novalidate aria-labelledby="expense-form-title">
+          <input type="hidden" id="expense-editing-id" data-editing-id />
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="expense-name">Nama Item <span aria-hidden="true">*</span></label>
+              <input class="form-input" type="text" id="expense-name" name="name" placeholder="Contoh: Makan siang" autocomplete="off" />
+              <span class="form-error" data-error="expense-name" role="alert"></span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="expense-amount">Jumlah (Rp) <span aria-hidden="true">*</span></label>
+              <input class="form-input" type="number" id="expense-amount" name="amount" placeholder="Contoh: 25000" min="0.01" step="0.01" />
+              <span class="form-error" data-error="expense-amount" role="alert"></span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="expense-category">Kategori <span aria-hidden="true">*</span></label>
+              <select class="form-input form-select" id="expense-category" name="category">
+                <option value="">-- Pilih Kategori --</option>
+                <option value="Makanan">Makanan</option>
+                <option value="Transportasi">Transportasi</option>
+                <option value="Hiburan">Hiburan</option>
+                <option value="Kesehatan">Kesehatan</option>
+                <option value="Perumahan">Perumahan</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+              <span class="form-error" data-error="expense-category" role="alert"></span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="expense-date">Tanggal <span aria-hidden="true">*</span></label>
+              <input class="form-input" type="date" id="expense-date" name="date" />
+              <span class="form-error" data-error="expense-date" role="alert"></span>
+            </div>
+
+            <div class="form-group form-group--full">
+              <label class="form-label" for="expense-description">Deskripsi (Opsional)</label>
+              <input class="form-input" type="text" id="expense-description" name="description" placeholder="Keterangan tambahan..." maxlength="500" autocomplete="off" />
+              <span class="form-error" data-error="expense-description" role="alert"></span>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn--primary" id="expense-submit-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="16" height="16"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              Tambah Transaksi
+            </button>
+            <button type="button" class="btn btn--secondary" id="expense-cancel-btn" hidden>
+              Batal Edit
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Filter controls -->
+      <div class="panel">
+        <h2 class="panel-title">Filter &amp; Pencarian</h2>
+        <div class="filter-row">
+          <div class="form-group">
+            <label class="form-label" for="filter-category">Kategori</label>
+            <select class="form-input form-select" id="filter-category">
+              <option value="">Semua Kategori</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="filter-date-from">Dari Tanggal</label>
+            <input class="form-input" type="date" id="filter-date-from" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="filter-date-to">Sampai Tanggal</label>
+            <input class="form-input" type="date" id="filter-date-to" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="filter-period">Periode</label>
+            <input class="form-input" type="month" id="filter-period" />
+          </div>
+          <div class="form-group form-group--action">
+            <button type="button" class="btn btn--secondary" id="filter-clear-btn">Hapus Filter</button>
+            <button type="button" class="btn btn--primary" id="export-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="16" height="16"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expense list table -->
+      <div class="panel">
+        <div class="panel-title-row">
+          <h2 class="panel-title">
+            Daftar Transaksi
+            <span class="badge" id="expense-count-badge">0</span>
+          </h2>
+          <div class="sort-controls" role="group" aria-label="Urutkan transaksi">
+            <span class="sort-label">Urutkan:</span>
+            <button type="button" class="btn-sort active" data-sort-field="date" data-sort-dir="desc" aria-pressed="true">
+              Tanggal <span class="sort-arrow">↓</span>
+            </button>
+            <button type="button" class="btn-sort" data-sort-field="amount" data-sort-dir="desc" aria-pressed="false">
+              Jumlah <span class="sort-arrow">↕</span>
+            </button>
+            <button type="button" class="btn-sort" data-sort-field="category" data-sort-dir="asc" aria-pressed="false">
+              Kategori <span class="sort-arrow">↕</span>
+            </button>
+          </div>
+        </div>
+        <div class="table-wrapper" role="region" aria-label="Daftar transaksi" tabindex="0">
+          <table class="expense-table" id="expense-table">
+            <thead>
+              <tr>
+                <th scope="col">Tanggal</th>
+                <th scope="col">Nama Item</th>
+                <th scope="col">Kategori</th>
+                <th scope="col" class="text-right">Jumlah</th>
+                <th scope="col" class="text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="expense-table-body">
+              <!-- rows rendered by JS -->
+            </tbody>
+          </table>
+          <p class="empty-state" id="expense-empty-state">Belum ada transaksi. Tambahkan transaksi pertama Anda!</p>
+        </div>
+      </div>
+
+    </section><!-- /view-expenses -->
+
+
+    <!-- ============================== -->
+    <!-- VIEW: BUDGET MANAGEMENT        -->
+    <!-- ============================== -->
+    <section id="view-budgets" class="view" aria-label="Manajemen Anggaran" hidden>
+
+      <div class="section-header">
+        <h1 class="section-title">Manajemen Anggaran</h1>
+      </div>
+
+      <!-- Budget form -->
+      <div class="panel">
+        <h2 class="panel-title" id="budget-form-title">Tambah Anggaran</h2>
+        <form id="budget-form" novalidate aria-labelledby="budget-form-title">
+          <input type="hidden" id="budget-editing-id" />
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="budget-category">Kategori <span aria-hidden="true">*</span></label>
+              <select class="form-input form-select" id="budget-category" name="category">
+                <option value="">-- Pilih Kategori --</option>
+              </select>
+              <span class="form-error" data-error="budget-category" role="alert"></span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="budget-period">Periode <span aria-hidden="true">*</span></label>
+              <input class="form-input" type="month" id="budget-period" name="period" />
+              <span class="form-error" data-error="budget-period" role="alert"></span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="budget-limit">Batas Anggaran (Rp) <span aria-hidden="true">*</span></label>
+              <input class="form-input" type="number" id="budget-limit" name="limit" placeholder="Contoh: 500000" min="0.01" step="0.01" />
+              <span class="form-error" data-error="budget-limit" role="alert"></span>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn--primary" id="budget-submit-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="16" height="16"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              Simpan Anggaran
+            </button>
+            <button type="button" class="btn btn--secondary" id="budget-cancel-btn" hidden>Batal Edit</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Budget list -->
+      <div class="panel">
+        <h2 class="panel-title">Daftar Anggaran</h2>
+        <div class="table-wrapper" role="region" aria-label="Daftar anggaran" tabindex="0">
+          <table class="expense-table" id="budget-table">
+            <thead>
+              <tr>
+                <th scope="col">Kategori</th>
+                <th scope="col">Periode</th>
+                <th scope="col" class="text-right">Batas Anggaran</th>
+                <th scope="col" class="text-right">Terpakai</th>
+                <th scope="col" class="text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="budget-table-body">
+            </tbody>
+          </table>
+          <p class="empty-state" id="budget-empty-state">Belum ada anggaran. Tambahkan anggaran pertama Anda!</p>
+        </div>
+      </div>
+
+      <!-- Category management -->
+      <div class="panel">
+        <h2 class="panel-title">Manajemen Kategori</h2>
+        <div class="category-add-row">
+          <div class="form-group" style="flex:1">
+            <label class="form-label" for="new-category-name">Nama Kategori Baru</label>
+            <input class="form-input" type="text" id="new-category-name" placeholder="Masukkan nama kategori..." maxlength="50" />
+            <span class="form-error" data-error="new-category-name" role="alert"></span>
+          </div>
+          <button type="button" class="btn btn--primary" id="add-category-btn">Tambah Kategori</button>
+        </div>
+        <ul class="category-list" id="category-list" aria-label="Daftar kategori">
+          <!-- rendered by JS -->
+        </ul>
+      </div>
+
+    </section><!-- /view-budgets -->
+
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="app-footer" role="contentinfo">
+    <p>&copy; 2025 PengeluaranKu — Data tersimpan di browser Anda.</p>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
+
